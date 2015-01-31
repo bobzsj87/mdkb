@@ -9,6 +9,7 @@ var _ = require('lodash');
 var ejs = require('ejs');
 var locale = require("locale");
 
+var helper = require('../helper');
 var config = require('../config');
 var supported = new locale.Locales(config.acceptedLocale);
 
@@ -25,8 +26,9 @@ router.use(function(req, res, next) {
     var before = "/";
     for (var i=0;i<segs.length;i++){
       var b = {
-        anchor: segs[i],
-        href: before + segs[i] + "/"
+        anchor: helper.trimMD(segs[i]),
+        href: before + segs[i] + "/",
+        isCurrent: (i==segs.length-1)
       };
       before = b.href;
       breadcrumb.push(b);
@@ -39,14 +41,31 @@ router.use(function(req, res, next) {
 
 router.get('/*', function(req, res) {
   var relPath = req.path.substring(1); // remove "/"
-  
   var absPath = path.resolve(config.docpath, relPath);
   var layoutPath = path.resolve(config.docpath, "layout.ejs");
   var blockPath = path.resolve(config.docpath, "block.ejs");
-
+  var indexPath = path.join(absPath, "index.ejs");
   var readFile = nodefn.lift(fs.readFile);
   var encoding = {encoding: "utf-8"};
-  nodefn.lift(fs.stat)(absPath)
+
+  when.promise(function(resolve){
+    fs.exists(indexPath, function(exists){
+      resolve(exists);
+    })
+  })
+  .then(function(exists){
+    return when.promise(function(resolve, reject){
+      if (exists){
+        fs.readFile(indexPath, encoding, function(err, html){
+          res.render(layoutPath, {body: html});
+          reject("rendered");
+        });
+      }
+      else{
+        resolve(nodefn.lift(fs.stat)(absPath));
+      }  
+    });
+  })
   .then(function(stat){
     if (stat.isFile()){
       return readFile(absPath, encoding);
@@ -55,18 +74,15 @@ router.get('/*', function(req, res) {
       return when.join(nodefn.lift(fs.readdir)(absPath), readFile(blockPath, encoding));
     } 
   })
-  .then(function(values){
+  .done(function(values){
     var html;
 
     if (_.isArray(values)){
       var items = [];
       values[0].forEach(function(v){
-        var isMD = path.extname(v) == config.mdExt;
-        var anchor = isMD ? _.trimRight(v, config.mdExt) : v;
         items.push({
-          anchor: anchor,
+          anchor: helper.trimMD(v),
           href: v+"/",
-          isMD: isMD
         })
       })
       html = ejs.render(values[1], {locals: {items:items}});
@@ -74,10 +90,12 @@ router.get('/*', function(req, res) {
     else{
       html = path.extname(relPath) == config.mdExt ? md(values) : values;
     }
-    res.render(layoutPath, {body: html});   
+    res.render(layoutPath, {body: html}); 
   }, function(err){
-    console.log(err);
-    res.status(500).send('err');
+    if (err !== "rendered"){
+      console.log(err);
+      res.status(500).send(err);
+    }
   });
 
 
