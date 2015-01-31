@@ -48,57 +48,45 @@ router.get('/*', function(req, res) {
   var readFile = nodefn.lift(fs.readFile);
   var encoding = {encoding: "utf-8"};
 
-  when.promise(function(resolve){
-    fs.exists(indexPath, function(exists){
-      resolve(exists);
-    })
-  })
-  .then(function(exists){
-    return when.promise(function(resolve, reject){
-      if (exists){
-        fs.readFile(indexPath, encoding, function(err, html){
-          res.render(layoutPath, {body: html});
-          reject("rendered");
-        });
-      }
-      else{
-        resolve(nodefn.lift(fs.stat)(absPath));
-      }  
-    });
-  })
-  .then(function(stat){
-    if (stat.isFile()){
-      return readFile(absPath, encoding);
-    }
-    if (stat.isDirectory()){
-      return when.join(nodefn.lift(fs.readdir)(absPath), readFile(blockPath, encoding));
-    } 
-  })
-  .done(function(values){
-    var html;
-
-    if (_.isArray(values)){
-      var items = [];
-      values[0].forEach(function(v){
-        items.push({
-          anchor: helper.trimMD(v),
-          href: v+"/",
-        })
-      })
-      html = ejs.render(values[1], {locals: {items:items}});
+  fs.exists(indexPath, function(exists){
+    if (exists){
+      fs.readFile(indexPath, encoding, function(err, html){
+        res.render(layoutPath, {body: html});
+      });
     }
     else{
-      html = path.extname(relPath) == config.mdExt ? md(values) : values;
-    }
-    res.render(layoutPath, {body: html}); 
-  }, function(err){
-    if (err !== "rendered"){
-      console.log(err);
-      res.status(500).send(err);
+      nodefn.lift(fs.stat)(absPath)
+        .then(function(stat){
+          if (stat.isFile()){
+            return readFile(absPath, encoding);
+          }
+          if (stat.isDirectory()){
+            return when.join(nodefn.lift(fs.readdir)(absPath), readFile(blockPath, encoding));
+          } 
+        })
+        .done(function(values){
+          var html;
+
+          if (_.isArray(values)){
+            var items = [];
+            values[0].forEach(function(v){
+              items.push({
+                anchor: helper.trimMD(v),
+                href: v+"/",
+              })
+            })
+            html = ejs.render(values[1], {locals: {items:items}});
+          }
+          else{
+            html = path.extname(relPath) == config.mdExt ? md(values) : values;
+          }
+          res.render(layoutPath, {body: html}); 
+        }, function(err){
+          console.log(err);
+          res.status(500).send(err);
+        });
     }
   });
-
-
 });
 
 
