@@ -21,26 +21,31 @@ router.use(function(req, res, next) {
     res.redirect(locales.best(supported)+"/");
   }
   else{
-    var segs = _.trim(req.path, "/").split('/');
-    var breadcrumb = [];
-    var before = "/";
-    for (var i=0;i<segs.length;i++){
-      var b = {
-        anchor: i==0?"Home":helper.trimMD(segs[i]),
-        href: before + segs[i] + "/",
-        isCurrent: (i==segs.length-1)
-      };
-      before = b.href;
-      breadcrumb.push(b);
+    if (!_.endsWith(req.path, "/")){
+      res.redirect(req.path + "/")
     }
-    res.locals.breadcrumb = breadcrumb;
-    next();
+    else{
+      var segs = _.trim(req.path, "/").split('/');
+      var breadcrumb = [];
+      var before = "/";
+      for (var i=0;i<segs.length;i++){
+        var b = {
+          anchor: i==0?"Help Center":helper.trimMD(decodeURI(segs[i])),
+          href: before + segs[i] + "/",
+          isCurrent: (i==segs.length-1)
+        };
+        before = b.href;
+        breadcrumb.push(b);
+      }
+      res.locals.breadcrumb = breadcrumb;
+      next();     
+    }
   }  
 });
 
 
 router.get('/*', function(req, res) {
-  var relPath = req.path.substring(1); // remove "/"
+  var relPath = decodeURI(req.path.substring(1)); // remove "/"
   var absPath = path.resolve(config.docpath, relPath);
   var layoutPath = path.resolve(config.docpath, "layout.ejs");
   var blockPath = path.resolve(config.docpath, "block.ejs");
@@ -68,10 +73,11 @@ router.get('/*', function(req, res) {
 
           if (_.isArray(values)){
             var items = [];
-            values[0].sort().forEach(function(v){
+            var files = _.difference(values[0], config.excludes);
+            files.sort().forEach(function(v){
               items.push({
                 anchor: helper.trimMD(v),
-                href: v+"/",
+                href: encodeURI(v)+"/",
                 isMD: helper.isMD(v)
               })
             })
