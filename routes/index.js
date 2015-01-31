@@ -26,6 +26,7 @@ router.use(function(req, res, next) {
     }
     else{
       var segs = _.trim(req.path, "/").split('/');
+      res.locals.lang = segs[0];
       var breadcrumb = [];
       var before = "/";
       for (var i=0;i<segs.length;i++){
