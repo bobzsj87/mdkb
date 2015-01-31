@@ -7,16 +7,20 @@ var when = require('when');
 var nodefn = require('when/node');
 var _ = require('lodash');
 var ejs = require('ejs');
+var locale = require("locale");
 
 var config = require('../config');
+var supported = new locale.Locales(config.acceptedLocale);
+
 
 router.use(function(req, res, next) {
-    if (req.path == "/"){
-      res.redirect("/en");
-    }
-    else{
-      next();
-    }  
+  if (req.path == "/"){
+    var locales = new locale.Locales(req.headers["accept-language"]);
+    res.redirect("/"+locales.best(supported));
+  }
+  else{
+    next();
+  }  
 });
 
 
