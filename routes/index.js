@@ -26,7 +26,7 @@ router.use(function(req, res, next) {
     var before = "/";
     for (var i=0;i<segs.length;i++){
       var b = {
-        anchor: helper.trimMD(segs[i]),
+        anchor: i==0?"Home":helper.trimMD(segs[i]),
         href: before + segs[i] + "/",
         isCurrent: (i==segs.length-1)
       };
@@ -45,12 +45,11 @@ router.get('/*', function(req, res) {
   var layoutPath = path.resolve(config.docpath, "layout.ejs");
   var blockPath = path.resolve(config.docpath, "block.ejs");
   var indexPath = path.join(absPath, "index.ejs");
-  var readFile = nodefn.lift(fs.readFile);
-  var encoding = {encoding: "utf-8"};
+  var readFile = function(path){return nodefn.lift(fs.readFile)(path, {encoding: "utf-8"})};
 
   fs.exists(indexPath, function(exists){
     if (exists){
-      fs.readFile(indexPath, encoding, function(err, html){
+      readFile(indexPath).then(function(html){
         res.render(layoutPath, {body: html});
       });
     }
@@ -58,10 +57,10 @@ router.get('/*', function(req, res) {
       nodefn.lift(fs.stat)(absPath)
         .then(function(stat){
           if (stat.isFile()){
-            return readFile(absPath, encoding);
+            return readFile(absPath);
           }
           if (stat.isDirectory()){
-            return when.join(nodefn.lift(fs.readdir)(absPath), readFile(blockPath, encoding));
+            return when.join(nodefn.lift(fs.readdir)(absPath), readFile(blockPath));
           } 
         })
         .done(function(values){
@@ -69,10 +68,11 @@ router.get('/*', function(req, res) {
 
           if (_.isArray(values)){
             var items = [];
-            values[0].forEach(function(v){
+            values[0].sort().forEach(function(v){
               items.push({
                 anchor: helper.trimMD(v),
                 href: v+"/",
+                isMD: helper.isMD(v)
               })
             })
             html = ejs.render(values[1], {locals: {items:items}});
