@@ -1,0 +1,6 @@
+{
+    "docpath":"./samples",
+    "acceptedLocale":["en", "zh"],
+    "mdExt":".md",
+    "excludes":[".DS_Store"]
+}
