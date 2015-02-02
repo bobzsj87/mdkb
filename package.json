@@ -12,6 +12,7 @@
     "ejs": "~0.8.5",
     "express": "~4.8.6",
     "express-partials": "^0.3.0",
+    "filewalker": "^0.1.2",
     "i18n-2": "^0.4.6",
     "locale": "0.0.20",
     "lodash": "^3.0.1",

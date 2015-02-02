@@ -8,6 +8,7 @@ var nodefn = require('when/node');
 var _ = require('lodash');
 var ejs = require('ejs');
 var locale = require("locale");
+var filewalker = require('filewalker');
 
 var helper = require('../helper');
 var config = require('../config');
@@ -44,8 +45,35 @@ router.use(function(req, res, next) {
   }  
 });
 
+router.get('/:lang/all.json', function(req, res){
+  var absPath = path.resolve(config.docpath, req.params.lang);
+  var options = {
+    maxPending: 10, // throttle handles 
+  };
+  var ret = [];
 
-router.get('/*', function(req, res) {
+  filewalker(absPath, options)
+    .on('stream', function(rs, p, s, fullPath) { 
+      rs.on('data', function(data) {
+        if (config.excludes.indexOf(path.basename(p)) == -1){
+          ret.push({
+            path: p,
+            title: path.basename(p),
+            body: data.toString()
+          });
+        }
+      });
+    })
+    .on('error', function(err) {
+      console.error(err);
+    })
+    .on('done', function() {
+      res.send(ret);
+    })
+  .walk();
+});
+
+router.get('/*', function(req, res, next) {
   var relPath = decodeURI(req.path.substring(1)); // remove "/"
   var absPath = path.resolve(config.docpath, relPath);
   var layoutPath = path.resolve(config.docpath, "layout.ejs");
@@ -89,8 +117,7 @@ router.get('/*', function(req, res) {
           }
           res.render(layoutPath, {body: html}); 
         }, function(err){
-          console.log(err);
-          res.status(500).send(err);
+          next(err);
         });
     }
   });
