@@ -2,13 +2,13 @@ var express = require('express');
 var router = express.Router();
 var path = require('path');
 var fs = require('fs');
-var md = require("node-markdown").Markdown;
 var when = require('when');
 var nodefn = require('when/node');
 var _ = require('lodash');
 var ejs = require('ejs');
 var locale = require("locale");
 var filewalker = require('filewalker');
+var marked = require('marked');
 
 var helper = require('../helper');
 var config = require('../config');
@@ -97,24 +97,35 @@ router.get('/*', function(req, res, next) {
             return when.join(nodefn.lift(fs.readdir)(absPath), readFile(blockPath));
           } 
         })
-        .done(function(values){
-          var html;
-
-          if (_.isArray(values)){
-            var items = [];
-            var files = _.difference(values[0], config.excludes);
-            files.sort().forEach(function(v){
-              items.push({
-                anchor: helper.trimMD(v),
-                href: encodeURI(v)+"/",
-                isMD: helper.isMD(v)
+        .then(function(values){
+          return when.promise(function(resolve, reject){
+            if (_.isArray(values)){
+              var items = [];
+              var files = _.difference(values[0], config.excludes);
+              files.sort().forEach(function(v){
+                items.push({
+                  anchor: helper.trimMD(v),
+                  href: encodeURI(v)+"/",
+                  isMD: helper.isMD(v)
+                })
               })
-            })
-            html = ejs.render(values[1], {locals: {items:items}});
-          }
-          else{
-            html = path.extname(relPath) == config.mdExt ? md(values) : values;
-          }
+              html = ejs.render(values[1], {locals: {items:items}});
+              resolve(html);
+            }
+            else{
+              if (path.extname(relPath) == config.mdExt){
+                marked(values, function (err, content) {
+                  if (err) reject(err);
+                  else resolve(content);
+                });
+              }
+              else{
+                resolve(values);
+              }
+            }
+          });
+        })
+        .done(function(html){
           res.render(layoutPath, {body: html}); 
         }, function(err){
           next(err);
